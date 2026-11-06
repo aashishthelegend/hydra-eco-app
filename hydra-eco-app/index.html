@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>HYDRA-ECO Universal Controller</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#06090e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="HYDRA-ECO">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="48x48" href="favicon-48.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #06090e;
+      --card-bg: rgba(14, 22, 34, 0.85);
+      --border: rgba(0, 240, 255, 0.22);
+      --cyan: #00f0ff;
+      --green: #10b981;
+      --yellow: #f59e0b;
+      --red: #ef4444;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+    body { background-color: var(--bg); color: var(--text); padding-bottom: 50px; display: flex; justify-content: center; }
+    .app-container { width: 100%; max-width: 480px; padding: 18px; }
+
+    header { display: flex; justify-content: space-between; align-items: center; padding: 14px 0 16px; border-bottom: 1px solid var(--border); }
+    .brand h1 { font-size: 1.3rem; font-weight: 800; }
+    .brand h1 span { color: var(--cyan); }
+    .brand p { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+
+    .status-pill { display: flex; align-items: center; gap: 7px; padding: 5px 12px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; transition: all 0.3s; }
+    .status-pill.offline { background: rgba(0, 240, 255, 0.12); color: var(--cyan); border: 1px solid rgba(0, 240, 255, 0.35); }
+    .status-pill.online { background: rgba(16, 185, 129, 0.15); color: var(--green); border: 1px solid rgba(16, 185, 129, 0.45); }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .status-pill.offline .status-dot { background: var(--cyan); box-shadow: 0 0 8px var(--cyan); animation: pulse 2s infinite; }
+    .status-pill.online .status-dot { background: var(--green); box-shadow: 0 0 8px var(--green); }
+    @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.85); } }
+
+    /* Hardware Detection Bar */
+    .conn-bar { display: flex; gap: 8px; margin: 14px 0; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 6px 12px; align-items: center; }
+    .conn-bar span { font-size: 0.72rem; color: var(--muted); font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+    .conn-bar input { flex: 1; background: transparent; border: none; color: var(--cyan); font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; outline: none; }
+    .btn-conn { background: rgba(0, 240, 255, 0.18); border: 1px solid var(--cyan); color: var(--cyan); font-size: 0.7rem; font-weight: 700; padding: 5px 12px; border-radius: 8px; cursor: pointer; transition: 0.2s; }
+    .btn-conn:active { transform: scale(0.96); background: var(--cyan); color: #06090e; }
+
+    .section-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); margin: 20px 0 12px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+    .section-title span.badge { font-size: 0.68rem; padding: 2px 8px; border-radius: 10px; font-family: 'JetBrains Mono', monospace; font-weight: 600; text-transform: none; }
+    .badge.sim { background: rgba(0, 240, 255, 0.15); color: var(--cyan); border: 1px solid rgba(0, 240, 255, 0.3); }
+    .badge.live { background: rgba(16, 185, 129, 0.15); color: var(--green); border: 1px solid rgba(16, 185, 129, 0.3); }
+
+    /* Telemetry Grid */
+    .telemetry-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 14px; }
+    .card-label { font-size: 0.74rem; color: var(--muted); font-weight: 500; }
+    .card-value { font-size: 1.5rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; margin: 6px 0 2px; color: var(--text); }
+    .card-sub { font-size: 0.7rem; color: var(--cyan); font-weight: 500; }
+
+    /* Stage Lifecycle */
+    .stage-card { margin-top: 12px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 14px; }
+    .stage-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .stage-header h4 { font-size: 0.82rem; font-weight: 600; }
+    .stage-header span { font-size: 0.72rem; font-family: 'JetBrains Mono', monospace; color: var(--green); font-weight: 700; }
+    .progress-track { width: 100%; height: 8px; background: rgba(255,255,255,0.06); border-radius: 10px; overflow: hidden; }
+    .progress-bar { height: 100%; width: 88%; background: linear-gradient(90deg, var(--cyan), var(--green)); border-radius: 10px; transition: width 0.4s ease; }
+
+    /* Relays */
+    .relay-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; margin-bottom: 10px; transition: 0.2s border-color; }
+    .relay-item.active { border-color: rgba(0, 240, 255, 0.45); }
+    .relay-info h4 { font-size: 0.9rem; font-weight: 600; color: #fff; }
+    .relay-info p { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+
+    .switch { position: relative; display: inline-block; width: 48px; height: 26px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #1e293b; transition: 0.3s; border-radius: 34px; border: 1px solid rgba(255,255,255,0.1); }
+    .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 4px; bottom: 3px; background-color: #fff; transition: 0.3s; border-radius: 50%; }
+    input:checked + .slider { background-color: var(--cyan); }
+    input:checked + .slider:before { transform: translateX(20px); background-color: #06090e; }
+
+    .btn-emergency { width: 100%; padding: 14px; margin-top: 18px; background: rgba(239, 68, 68, 0.15); border: 1px solid var(--red); color: var(--red); border-radius: 14px; font-weight: 700; font-size: 0.88rem; cursor: pointer; transition: 0.2s; }
+    .btn-emergency:active { background: var(--red); color: #fff; }
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    <header>
+      <div class="brand">
+        <h1>HYDRA<span>-ECO</span></h1>
+        <p>Household Wastewater Treatment & IoT Controller</p>
+      </div>
+      <div class="status-pill offline" id="connPill">
+        <div class="status-dot"></div>
+        <span id="connText">STANDALONE (READY)</span>
+      </div>
+    </header>
+
+    <!-- Seamless Hardware Auto-Detect & IP Target -->
+    <div class="conn-bar">
+      <span>TARGET ESP32:</span>
+      <input type="text" id="espIpInput" value="192.168.100.200">
+      <button class="btn-conn" id="btnConnect" onclick="manualCheckHardware()">SYNC</button>
+    </div>
+
+    <!-- Live Telemetry -->
+    <div class="section-title">
+      Live Water Quality Telemetry
+      <span class="badge sim" id="modeBadge">Simulation Mode</span>
+    </div>
+
+    <div class="telemetry-grid">
+      <div class="card">
+        <div class="card-label">Treated Clarity</div>
+        <div class="card-value" id="valTurbidity">2.3 NTU</div>
+        <div class="card-sub" id="turbSub" style="color:var(--green);">✓ Potable Clear (&lt; 4 NTU)</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Effluent pH</div>
+        <div class="card-value" id="valPH">7.22</div>
+        <div class="card-sub">Neutral Range (6.5 – 8.5)</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Clean Tank Storage</div>
+        <div class="card-value" id="valTank">84%</div>
+        <div class="card-sub" id="tankSub">Ultrasonic Depth (12.6 cm)</div>
+      </div>
+      <div class="card">
+        <div class="card-label">MBBR Dissolved O₂</div>
+        <div class="card-value" id="valDO">6.5 mg/L</div>
+        <div class="card-sub">Active Aerobic Biofilm</div>
+      </div>
+    </div>
+
+    <div class="stage-card">
+      <div class="stage-header">
+        <h4>8-Stage Purification Lifecycle</h4>
+        <span id="stageStatus">Stage 7: UV-C Disinfection Active</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-bar" id="lifecycleBar"></div>
+      </div>
+    </div>
+
+    <!-- Hardware Actuators -->
+    <div class="section-title">Hardware Actuators & Relays</div>
+    
+    <div class="relay-item active" id="itemAeration">
+      <div class="relay-info">
+        <h4>MBBR Air Aerator Pump</h4>
+        <p>Supplies micro-bubbles to bio-media</p>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="relayAeration" checked onchange="toggleRelay('aeration', this.checked)">
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="relay-item active" id="itemPump">
+      <div class="relay-info">
+        <h4>12V Water Lift Pump</h4>
+        <p>Circulates through Sand & Carbon</p>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="relayPump" checked onchange="toggleRelay('pump', this.checked)">
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="relay-item active" id="itemUV">
+      <div class="relay-info">
+        <h4>UV-C Germicidal Module</h4>
+        <p>Neutralizes 99.9% bacterial pathogens</p>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="relayUV" checked onchange="toggleRelay('uv', this.checked)">
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <div class="relay-item" id="itemValve">
+      <div class="relay-info">
+        <h4>Distribution Solenoid Valve</h4>
+        <p>Routes treated water to toilet flush line</p>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="relayValve" onchange="toggleRelay('valve', this.checked)">
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <button class="btn-emergency" onclick="emergencyStop()">EMERGENCY SYSTEM CUTOFF</button>
+  </div>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW:', err));
+      });
+    }
+
+    let isEspConnected = false;
+    let espBaseUrl = "http://192.168.100.200";
+
+    function getEspUrl() {
+      const input = document.getElementById('espIpInput').value.trim();
+      return input.startsWith('http') ? input : `http://${input}`;
+    }
+
+    async function pollEsp32() {
+      espBaseUrl = getEspUrl();
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 1200);
+
+        const res = await fetch(`${espBaseUrl}/api/telemetry`, {
+          cache: 'no-store',
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (res.ok) {
+          const data = await res.json();
+          // Update live data from physical sensors
+          document.getElementById('valTurbidity').innerText = data.turbidity.toFixed(1) + " NTU";
+          document.getElementById('valPH').innerText = data.ph.toFixed(2);
+          document.getElementById('valTank').innerText = data.tank_level + "%";
+
+          document.getElementById('relayAeration').checked = data.relays.aeration;
+          document.getElementById('relayPump').checked = data.relays.pump;
+          document.getElementById('relayUV').checked = data.relays.uv;
+          document.getElementById('relayValve').checked = data.relays.valve;
+
+          setConnectionState(true);
+          updateActuatorVisuals();
+          return;
+        }
+      } catch (err) {
+        // ESP32 not reachable -> Seamless fallback to simulation
+        setConnectionState(false);
+      }
+
+      runSimulationFluctuations();
+    }
+
+    function setConnectionState(connected) {
+      isEspConnected = connected;
+      const pill = document.getElementById('connPill');
+      const text = document.getElementById('connText');
+      const badge = document.getElementById('modeBadge');
+
+      if (connected) {
+        pill.className = "status-pill online";
+        text.innerText = "ESP32 ONLINE";
+        badge.className = "badge live";
+        badge.innerText = "Live Telemetry";
+      } else {
+        pill.className = "status-pill offline";
+        text.innerText = "STANDALONE (READY)";
+        badge.className = "badge sim";
+        badge.innerText = "Simulation Mode";
+      }
+    }
+
+    function runSimulationFluctuations() {
+      const baseTurb = 2.3 + (Math.sin(Date.now() / 3200) * 0.3);
+      const basePH = 7.22 + (Math.cos(Date.now() / 4500) * 0.06);
+      document.getElementById('valTurbidity').innerText = baseTurb.toFixed(1) + " NTU";
+      document.getElementById('valPH').innerText = basePH.toFixed(2);
+    }
+
+    async function toggleRelay(target, state) {
+      if (navigator.vibrate) navigator.vibrate(40);
+      updateActuatorVisuals();
+
+      if (isEspConnected) {
+        try {
+          await fetch(`${espBaseUrl}/api/relay?target=${target}&state=${state ? 1 : 0}`);
+        } catch (err) {
+          console.warn("Relay command failed:", err);
+        }
+      }
+    }
+
+    function updateActuatorVisuals() {
+      const aer = document.getElementById('relayAeration').checked;
+      const pump = document.getElementById('relayPump').checked;
+      const uv = document.getElementById('relayUV').checked;
+      const valve = document.getElementById('relayValve').checked;
+
+      document.getElementById('itemAeration').classList.toggle('active', aer);
+      document.getElementById('itemPump').classList.toggle('active', pump);
+      document.getElementById('itemUV').classList.toggle('active', uv);
+      document.getElementById('itemValve').classList.toggle('active', valve);
+
+      const bar = document.getElementById('lifecycleBar');
+      const status = document.getElementById('stageStatus');
+
+      if (!pump && !aer && !uv) {
+        bar.style.width = "0%";
+        status.innerText = "System Standby / Idle";
+        status.style.color = "var(--muted)";
+      } else if (valve) {
+        bar.style.width = "100%";
+        status.innerText = "Stage 8: Distribution Valve Open";
+        status.style.color = "var(--cyan)";
+      } else if (uv) {
+        bar.style.width = "88%";
+        status.innerText = "Stage 7: UV-C Disinfection Active";
+        status.style.color = "var(--green)";
+      } else if (pump) {
+        bar.style.width = "65%";
+        status.innerText = "Stage 5-6: Sand & Carbon Filtration";
+        status.style.color = "var(--cyan)";
+      } else if (aer) {
+        bar.style.width = "35%";
+        status.innerText = "Stage 3: MBBR Aerobic Bio-Degradation";
+        status.style.color = "var(--green)";
+      }
+    }
+
+    function manualCheckHardware() {
+      pollEsp32();
+    }
+
+    function emergencyStop() {
+      if (confirm("Execute Emergency Cutoff on all actuators?")) {
+        ['relayAeration', 'relayPump', 'relayUV', 'relayValve'].forEach(id => {
+          document.getElementById(id).checked = false;
+        });
+        updateActuatorVisuals();
+        if (isEspConnected) {
+          ['aeration', 'pump', 'uv', 'valve'].forEach(r => {
+            fetch(`${espBaseUrl}/api/relay?target=${r}&state=0`).catch(() => {});
+          });
+        }
+      }
+    }
+
+    // Continuously check for ESP32 or run simulation every 1.5 seconds
+    setInterval(pollEsp32, 1500);
+  </script>
+</body>
+</html>
